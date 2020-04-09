@@ -14,14 +14,17 @@ Pressing 'space' will reload the file and redraw the instructions
  - 'SETXY X Y' : go to the position (x, y). The screen is centered to (0, 0)
  - 'TO PROCEDURENAME :ARG1 ARG2... \n INSTRUCTIONS \n END' : customizable function
  - '#' : comments, everything until newline don't affect the program
- - '#*   *#' multiline comment
+ - '#*   *#' : multiline comment
 
-## Examples ##
+## Examples
  - square > REPEAT 4 [FD 100 RT 90]
  - circle > REPEAT 360 [FD 2 RT 1] or REPEAT R [FD A RT B] with R*B=360
  - shift to the left > PU LT 90 FD 100 RT 90 PD
  - dotted line > REPEAT 40 [FD 2 PU FD 2 PD]
  - dotted square > REPEAT 4 [REPEAT 40 [FD 2 PU FD 2 PD] RT 90]
- - function triangle > TRIANGLE :L REPEAT 3 [FD L RT 120] END
+ - function triangle > TRIANGLE :L\nREPEAT 3 [FD L RT 120]\nEND
 
-
+## TODO
+ - A set heading keyword with an angle or NSEW
+ - A random keyword
+ - Allow lowercase
