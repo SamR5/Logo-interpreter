@@ -148,7 +148,7 @@ class UnknownNameException : public std::exception {
       UnknownNameException(const char* name, const char* func_="", const char* info_="") :
         unknownName(name), functionName(func_), infos(info_) {}
       const char* what() {
-          return "UnknownNameException";
+          return "Unknown name";
       }
       const char* get_func() const {
           return functionName;
@@ -167,7 +167,7 @@ class InvalidArgToFunction : public std::exception {
       InvalidArgToFunction(std::string name, VecStr param, VecStr args) :
         functionName(name), arguments(args), parameters(param) {}
       const char* what() {
-          return "InvalidArgToFunction";
+          return "Invalid argument to function";
       }
       std::string get_param_str() const {
           std::string s;
@@ -182,6 +182,19 @@ class InvalidArgToFunction : public std::exception {
               s += a + " ";
           }
           return s;
+      }
+};
+
+class InvalidFunctionDefinition : public std::exception {
+    private:
+      std::string functionName;
+    public:
+      InvalidFunctionDefinition(std::string name) : functionName(name) {}
+      const char* what() {
+          return "Invalid function definition";
+      }
+      std::string get_func() {
+          return functionName;
       }
 };
 
@@ -317,29 +330,34 @@ void to_mainSet() {
 bool extract_functions(VecStr set) {
     for (int i=0; i<set.size(); i++) {
         if (set[i] == "TO") {
-            Function func;
-            int toSkip(2);
-            if (set[i+2] == ":") { // if the function takes arguments
+            try {
+                Function func;
+                int toSkip(2);
+                if (set[i+2] == ":") { // if the function takes arguments
+                    toSkip++;
+                    while (set[i+toSkip] != "END_OF_ARGS") {
+                        func.parameters.push_back(set[i+toSkip]);
+                        toSkip++;
+                    }
+                } else { // if the functions doesn't takes arguments
+                    toSkip--;
+                }
+                // first item after arguments
                 toSkip++;
-                while (set[i+toSkip] != "END_OF_ARGS") {
-                    func.parameters.push_back(set[i+toSkip]);
+                while (set[i+toSkip] != "END") {
+                    if (set[i+toSkip] == "TO" || toSkip+i >= set.size()) {
+                        throw InvalidFunctionDefinition(set[i+1]);
+                    }
+                    func.instructions.push_back(set[i+toSkip]);
                     toSkip++;
                 }
-            } else { // if the functions doesn't takes arguments
-                toSkip--;
+                functions[set[i+1]] = func;
+                i += toSkip;
+            } catch (InvalidFunctionDefinition& ifd) {
+                std::cerr << "Error (" << ifd.what() << ") >> ";
+                std::cerr << ifd.get_func() << std::endl;
+                return false;
             }
-            // first item after arguments
-            toSkip++;
-            while (set[i+toSkip] != "END") {
-                func.instructions.push_back(set[i+toSkip]);
-                toSkip++;
-                if (toSkip+i >= set.size()) {
-                    std::cout << "Error (function not ended) >> " << set[i+1] << std::endl;
-                    return false;
-                }
-            }
-            functions[set[i+1]] = func;
-            i += toSkip;
         }
     }
     return true;
@@ -409,10 +427,11 @@ bool move_turtle(VecStr set, Turtle& T) {
                     }
                     i += f->second.parameters.size();
                 } catch (InvalidArgToFunction& iatf) {
-                    std::cerr << "Error (Invalid argument to function)\n";
+                    std::cerr << "Error (" << iatf.what() << ") >> " << f->first << std::endl;
                     std::cerr << "Name: " << f->first << std::endl;
                     std::cerr << "Parameters: " << iatf.get_param_str() << std::endl;
                     std::cerr << "Arguments: " << iatf.get_args_str() << std::endl;
+                    return false;
                 }
             } else if (set[i] != "]" && set[i] != "[" && set[i] != " " && !is_number(set[i])) {
                 
@@ -426,7 +445,7 @@ bool move_turtle(VecStr set, Turtle& T) {
         return false;
         
     } catch (UnknownNameException& une) {
-        std::cerr << "Error (Unknown command " << set[i] << ") >> ";
+        std::cerr << "Error (" << une.what() << ") >> ";
         std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
         return false;
     }
