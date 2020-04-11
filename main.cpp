@@ -5,9 +5,8 @@ LOGO programming language
 Parse the instructions in instructions.txt and draw
 
 TODO :
- - functions
- - multi line comments (#* ... *#)
  - clearscreen
+ - a way to check if arguments passed to function are correct
 */
 
 #include <GL/gl.h>
@@ -21,6 +20,8 @@ TODO :
 #include <utility>
 #include <map>
 #include <algorithm>
+#include <regex>
+#include <exception>
 
 #define WIDTH 800
 #define HEIGHT 600
@@ -29,61 +30,49 @@ TODO :
 #define DEG2RAD PI/180.0
 
 typedef std::pair<float, float> pair2f;
+typedef std::vector<std::string> VecStr;
+
+struct Turtle;
+struct Function;
+class UnknownNameException;// : public std::exception;
+class InvalidArgToFunction;// : public std::exception;
 
 void init();
 bool is_number(std::string s);
-std::string get_instructions();
+std::string get_file_instructions();
+void check_change();
 void remove_lead_trail_space(std::string& s);
 void remove_comment(std::string& s); // if comment at end of line
-void to_tokens();
-void move_turtle(std::vector<std::string> token);
+void to_mainSet();
+bool extract_functions(VecStr set);
+bool move_turtle(VecStr set, Turtle& T); // return false on exception
 void reset();
 
 void display_callback();
 void reshape_callback(int width, int height);
 void timer_callback(int);
-void keyboard_callback(unsigned char key, int x, int y);
+
+VecStr longNames = {"FORWARD", "BACKWARD", "RIGHT", "LEFT", "PENUP", "PENDOWN", "SETXY", "REPEAT"};
+VecStr shortNames = {"FD", "BD", "RT", "LT", "PU", "PD", "SETXY", "REPEAT"};
+VecStr oneInt = {"FD", "BD", "RT", "LT", "REPEAT"}; // instructions that require one integer after
+VecStr twoInt = {"SETXY"}; // instructions that require two integer after
+VecStr noInt = {"PU", "PD", "TO", "[", "]", "END"}; // instructions that require a non-integer after
 
 std::string instructions;
-std::vector<std::string> tokens;
+VecStr mainSet;
 std::vector<pair2f> path;
 std::vector<std::vector<pair2f>> paths;
-//std::map<std::string, std::vector<std::string>> functions;
-
-struct Function {
-    //std::string name;
-    std::vector<std::string> args;
-    std::vector<std::string> instructions;
-    std::vector<std::string> get_instructions(std::vector<std::string> arguments) {
-        std::vector<std::string> newInstructions = instructions;
-        for (int i=0; i<arguments.size(); i++) {
-            std::replace(newInstructions.begin(), newInstructions.end(), 
-                         args[i], arguments[i]);
-        }
-        return newInstructions;
-    }
-    void show() {
-        std::cout << "args: ";
-        for (auto i : args)
-            std::cout << i << " ";
-        std::cout << std::endl;
-        std::cout << "instructions: ";
-        for (auto i : instructions)
-            std::cout << i << " ";
-        std::cout << std::endl;
-    }
-};
-std::map<std::string, Function> functions;
 
 struct Turtle {
     float x;
     float y;
     int angle;
-    bool isUp;
+    bool isDown;
+    bool savePath;
     void fd(int value) {
         x += value * std::cos(angle*DEG2RAD);
         y += value * std::sin(angle*DEG2RAD);
-        if (!isUp) {
+        if (isDown && savePath) {
             path.push_back({x, y});
         }
     }
@@ -97,23 +86,104 @@ struct Turtle {
         angle -= value;
     }
     void up() {
-        isUp = true;
-        paths.push_back(path);
-        path.clear();
+        isDown = false;
+        if (savePath) {
+            paths.push_back(path);
+            path.clear();
+        }
     }
     void down() {
-        isUp = false;
-        path.clear();
-        path.push_back({x, y});
+        isDown = true;
+        if (savePath) {
+            path.push_back({x, y});
+        }
     }
     void setxy(int x_, int y_) {
         x = x_;
         y = y_;
-        if (!isUp) {
+        if (isDown && savePath) {
             path.push_back({x, y});
         }
     }
-} T;
+} mainT;
+
+struct Function {
+    VecStr parameters;
+    VecStr instructions;
+    VecStr get_instructions(VecStr arguments) {
+        VecStr newInstructions = instructions;
+        for (int i=0; i<arguments.size(); i++) {
+            std::replace(newInstructions.begin(), newInstructions.end(), 
+                         parameters[i], arguments[i]);
+        }
+        return newInstructions;
+    }
+    bool is_valid(VecStr arguments) {
+        VecStr newInst = get_instructions(arguments);
+        Turtle tempT;
+        tempT.x = tempT.y = tempT.angle = 0;
+        tempT.isDown = true;
+        tempT.savePath = false;
+        return move_turtle(newInst, tempT);
+    }
+    void show() {
+        std::cout << "parameters: ";
+        for (auto i : parameters)
+            std::cout << i << " ";
+        std::cout << std::endl;
+        std::cout << "instructions: ";
+        for (auto i : instructions)
+            std::cout << i << " ";
+        std::cout << std::endl;
+    }
+};
+std::map<std::string, Function> functions;
+
+class UnknownNameException : public std::exception {
+    private:
+      const char* unknownName;
+      const char* functionName;
+      const char* infos;
+    public:
+      UnknownNameException(const char* name, const char* func_="", const char* info_="") :
+        unknownName(name), functionName(func_), infos(info_) {}
+      const char* what() {
+          return "UnknownNameException";
+      }
+      const char* get_func() const {
+          return functionName;
+      }
+      const char* get_info() const {
+          return infos;
+      }
+};
+
+class InvalidArgToFunction : public std::exception {
+    private:
+      std::string functionName;
+      VecStr parameters;
+      const VecStr arguments;
+    public:
+      InvalidArgToFunction(std::string name, VecStr param, VecStr args) :
+        functionName(name), arguments(args), parameters(param) {}
+      const char* what() {
+          return "InvalidArgToFunction";
+      }
+      std::string get_param_str() const {
+          std::string s;
+          for (auto p : parameters) {
+              s += p + " ";
+          }
+          return s;
+      }
+      std::string get_args_str() const {
+          std::string s;
+          for (auto a : arguments) {
+              s += a + " ";
+          }
+          return s;
+      }
+};
 
 void init() {
     glClearColor(0.2, 0.3, 0.4, 1.0);
@@ -132,7 +202,17 @@ bool is_number(std::string s) {
     return true;
 }
 
-std::string get_instructions() {
+int to_int(std::string s) {
+    for (int i=0; i<s.size(); i++) {
+        if (s[i]<'0' || s[i]>'9') {
+            if (i==0 && s[i]=='-') continue;
+            throw std::invalid_argument("stoi");
+        }
+    }
+    return std::stoi(s);
+}
+
+std::string get_file_instructions() {
     std::ifstream file("instructions.txt");
     std::stringstream ss;
     std::string temp;
@@ -140,15 +220,15 @@ std::string get_instructions() {
     
     if (file) {
         while (getline(file, temp)) {
-            if (stopParse || temp=="") { // getline doesn't catch the endline'
-                continue;
-            }
             remove_lead_trail_space(temp);
-            if (temp[0]=='#' && temp[1]=='*') {
+            if (temp=="#*") {
                 stopParse = true;
                 continue;
-            } else if (temp[0]=='*' && temp[1]=='#') {
+            } else if (temp=="*#") {
                 stopParse = false;
+                continue;
+            }
+            if (stopParse || temp=="") { // getline doesn't catch the endline
                 continue;
             }
             if (temp[0] != '#') { // if not a comment
@@ -159,7 +239,16 @@ std::string get_instructions() {
     }
     std::string result = ss.str();
     remove_lead_trail_space(result);
+    std::transform(result.begin(), result.end(), result.begin(), toupper);
     return result;
+}
+
+void check_change() {
+    std::string temp = get_file_instructions();
+    if (temp!=instructions) {
+        instructions = temp;
+        reset();
+    }
 }
 
 void remove_lead_trail_space(std::string& s) {
@@ -183,127 +272,187 @@ void remove_comment(std::string& s) {
     }
 }
 
-void to_tokens() {
+void to_mainSet() {
     std::string s;
     bool nextLineIsEndOfArg(false);
     for (int i=0; i<instructions.length(); i++) {
         if (instructions[i] != ' ' && instructions[i] != '\n') {
             if (instructions[i] == '[') {
-                tokens.push_back("[");
+                mainSet.push_back("[");
             } else if (instructions[i] == ']') {
-                tokens.push_back(s);
-                tokens.push_back("]");
+                mainSet.push_back(s);
+                mainSet.push_back("]");
                 s.clear();
-                i++;
             } else if (instructions[i] == ':') {
-                tokens.push_back(":");
+                mainSet.push_back(":");
                 nextLineIsEndOfArg = true;
             } else {
                 s += instructions[i];
             }
         } else {
-            tokens.push_back(s);
-            s.clear();
+            mainSet.push_back(s);
             if (nextLineIsEndOfArg && instructions[i] == '\n') {
-                tokens.push_back("END_OF_ARGS");
+                mainSet.push_back("END_OF_ARGS");
                 nextLineIsEndOfArg = false;
             }
+            s.clear();
         }
     }
-    if (s!="")
-        tokens.push_back(s);
+    if (s!="") { // don't remember why I wrote this
+        std::cout << s << std::endl;
+        mainSet.push_back(s);
+    }
+    // replace the long words with abreviations
+    for (int i=0; i<longNames.size(); i++) {
+            std::replace(mainSet.begin(), mainSet.end(), longNames[i], shortNames[i]);
+    }
     /*
-    for (auto i : tokens) {
+    for (auto i : mainSet) {
         std::cout << i << '-';
     }
     std::cout << std::endl;
     */
 }
 
-void move_turtle(std::vector<std::string> token) {
-    for (int i=0; i<token.size(); i++) {
-        if (token[i] == "FD" || token[i] == "FORWARD") {
-            T.fd(std::stoi(token[i+1]));
-        } else if (token[i] == "BD" || token[i] == "BACKWARD") {
-            T.bd(std::stoi(token[i+1]));
-        } else if (token[i] == "RT" || token[i] == "RIGHT") {
-            T.rt(std::stoi(token[i+1]));
-        } else if (token[i] == "LT" || token[i] == "LEFT") {
-            T.lt(std::stoi(token[i+1]));
-        } else if (token[i] == "REPEAT") {
-            int count(-1); // to count '[]' in case they are nested
-            int toSkip(0); // tokens to skip depending on the length
-            for (int j=i+3; j<token.size(); j++) {
-                if (token[j] == "[") {
-                    count--;
-                } else if (token[j] == "]") {
-                    count++;
-                }
-                toSkip++;
-                if (count==0) {
-                    break;
-                }
-            }
-            std::vector<std::string> subtoken(token.begin()+i+3,
-                                              token.begin()+i+3+toSkip);
-            for (int x=0; x<std::stoi(token[i+1]); x++) {
-                move_turtle(subtoken);
-            }
-            i += toSkip;
-        } else if (token[i] == "PU" || token[i] == "PENUP") {
-            T.up();
-        } else if (token[i] == "PD" || token[i] == "PENDOWN") {
-            T.down();
-        } else if (token[i] == "SETXY") {
-            T.setxy(std::stoi(token[i+1]), std::stoi(token[i+2]));
-            i += 2;
-        } else if (token[i] == "TO") { // add a function to the list
-            Function func;// = {token[i+1]};
+bool extract_functions(VecStr set) {
+    for (int i=0; i<set.size(); i++) {
+        if (set[i] == "TO") {
+            Function func;
             int toSkip(2);
-            if (token[i+2] == ":") { // if the function takes arguments
+            if (set[i+2] == ":") { // if the function takes arguments
                 toSkip++;
-                while (token[i+toSkip] != "END_OF_ARGS") {
-                    
-                    func.args.push_back(token[i+toSkip]);
+                while (set[i+toSkip] != "END_OF_ARGS") {
+                    func.parameters.push_back(set[i+toSkip]);
                     toSkip++;
                 }
+            } else { // if the functions doesn't takes arguments
+                toSkip--;
             }
-            // first token after arguments
+            // first item after arguments
             toSkip++;
-            while (token[i+toSkip] != "END") {
-                func.instructions.push_back(token[i+toSkip]);
+            while (set[i+toSkip] != "END") {
+                func.instructions.push_back(set[i+toSkip]);
                 toSkip++;
+                if (toSkip+i >= set.size()) {
+                    std::cout << "Error (function not ended) >> " << set[i+1] << std::endl;
+                    return false;
+                }
             }
-            functions[token[i+1]] = func;
+            functions[set[i+1]] = func;
             i += toSkip;
-            //f->second.show();
-        } else if (functions.find(token[i]) != functions.end()) { // if the function is known
-            auto f = functions.find(token[i]);
-            std::vector<std::string> args;
-            for (int arg=0; arg<f->second.args.size(); arg++) {
-                args.push_back(token[i+1+arg]);
-            }
-            
-            move_turtle(f->second.get_instructions(args));
-        } else if (token[i] != "]" && token[i] != "[" && !is_number(token[i])) {
-            std::cout << "Error : command not found " << token[i] << std::endl;
         }
     }
+    return true;
+}
+
+bool move_turtle(VecStr set, Turtle& T) {
+    /*for (auto i : set) {
+        std::cout << i << "-";
+    }
+    std::cout << std::endl;*/
+    int i; // to use it after if exception
+    try {
+        for (i=0; i<set.size()-1; i++) {
+            if (set[i] == "FD") {
+                T.fd(to_int(set[i+1])); i++; // to skip the next item
+            } else if (set[i] == "BD") {
+                T.bd(to_int(set[i+1])); i++;
+            } else if (set[i] == "RT") {
+                T.rt(to_int(set[i+1])); i++;
+            } else if (set[i] == "LT") {
+                T.lt(to_int(set[i+1])); i++;
+            } else if (set[i] == "REPEAT") {
+                int count(-1); // to count '[]' in case they are nested
+                int toSkip(0); // items to skip depending on the length
+                for (int j=i+3; j<set.size(); j++) {
+                    if (set[j] == "[") {
+                        count--;
+                    } else if (set[j] == "]") {
+                        count++;
+                    }
+                    toSkip++;
+                    if (count==0) {
+                        break;
+                    }
+                }
+                VecStr subset(set.begin()+i+3, set.begin()+i+3+toSkip);
+                for (int x=0; x<to_int(set[i+1]); x++) {
+                    if (!move_turtle(subset, T)) {
+                        return false;
+                    }
+                }
+                i += toSkip;
+            } else if (set[i] == "PU") {
+                T.up();
+            } else if (set[i] == "PD") {
+                T.down();
+            } else if (set[i] == "SETXY") {
+                T.setxy(to_int(set[i+1]), to_int(set[i+2]));
+                i += 2;
+            } else if (set[i] == "TO") {
+                while (set[i] != "END")
+                    i++;
+            } else if (functions.find(set[i]) != functions.end()) { // if the function is known
+                auto f = functions.find(set[i]);
+                VecStr args;
+                try {
+                    for (int arg=0; arg<f->second.parameters.size(); arg++) {
+                        args.push_back(set[i+1+arg]);
+                    }
+                    if (!f->second.is_valid(args)) {
+                        std::vector<char> buffer(set[i].begin(), set[i].end());
+                        //throw InvalidArgToFunction(&buffer[0], args);
+                        throw InvalidArgToFunction(f->first, f->second.parameters, args);
+                    }
+                    if (!move_turtle(f->second.get_instructions(args), T)) {
+                        return false;
+                    }
+                    i += f->second.parameters.size();
+                } catch (InvalidArgToFunction& iatf) {
+                    std::cerr << "Error (Invalid argument to function)\n";
+                    std::cerr << "Name: " << f->first << std::endl;
+                    std::cerr << "Parameters: " << iatf.get_param_str() << std::endl;
+                    std::cerr << "Arguments: " << iatf.get_args_str() << std::endl;
+                }
+            } else if (set[i] != "]" && set[i] != "[" && set[i] != " " && !is_number(set[i])) {
+                
+                std::vector<char> buffer(set[i].begin(), set[i].end());
+                throw UnknownNameException(&buffer[0]);
+            }
+        }
+    } catch (const std::invalid_argument& ia) {
+        std::cerr << "Error (Invalid argument to " << ia.what() << ") >> ";
+        std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
+        return false;
+        
+    } catch (UnknownNameException& une) {
+        std::cerr << "Error (Unknown command " << set[i] << ") >> ";
+        std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
+        return false;
+    }
+    return true;
 }
 
 void reset() {
-    tokens.clear();
+    std::cout << "New drawing\n";
+    mainSet.clear();
     path.clear();
     paths.clear();
-    T.x = T.y = 0;
-    T.angle = 0;
-    T.isUp = false;
-    path.push_back({T.x, T.y});
-    instructions = get_instructions();
-    to_tokens();
-    
-    move_turtle(tokens);
-    T.up(); // saves the last path
+    functions.clear();
+    mainT.x = mainT.y = 0;
+    mainT.angle = 0;
+    mainT.isDown = true;
+    mainT.savePath = true;
+    path.push_back({mainT.x, mainT.y});
+    instructions = get_file_instructions();
+    to_mainSet();
+    // in case there is an exception at the EOF
+    mainSet.push_back(" "); mainSet.push_back(" ");
+    if (!extract_functions(mainSet)) {
+        return;
+    };
+    move_turtle(mainSet, mainT);
+    mainT.up(); // saves the last path
 }
 
 void display_callback() {
@@ -335,13 +484,8 @@ void reshape_callback(int width, int height) {
 
 void timer_callback(int) {
     glutPostRedisplay(); // run the display_callback function
+    check_change();
     glutTimerFunc(1000/FPS, timer_callback, 0);
-}
-
-void keyboard_callback(unsigned char key, int x, int y) {
-    if (key == ' ') {
-        reset();
-    }
 }
 
 int main(int argc, char **argv) {
@@ -353,7 +497,6 @@ int main(int argc, char **argv) {
     glutDisplayFunc(display_callback);
     glutReshapeFunc(reshape_callback);
     glutTimerFunc(0, timer_callback, 0);
-    glutKeyboardFunc(keyboard_callback);
     
     init();
     
