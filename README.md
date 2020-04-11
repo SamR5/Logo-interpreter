@@ -48,6 +48,11 @@ Pressing 'space' will reload the file and redraw the instructions
 ## TODO
  - A set heading keyword with an angle or NSEW
  - A random keyword
+ - Allow rithmetic operation "+-*/()" (with regex ???)
+ - A set pen color keyword with RGB as arguments
+ - Animate the turtle !!!
+ - A clear screen keyword
+ - A wait keyword to control the animation
 
 ## Updates
 ### 11/04/2020
