@@ -48,9 +48,9 @@ Pressing 'space' will reload the file and redraw the instructions
 ## TODO
  - A set heading keyword with an angle or NSEW
  - A random keyword
- - Allow lowercase
 
 ## Updates
 ### 11/04/2020
     - Exception handling
     - Automatically draw when the file is modified
+    - Allow lowercase (the whole instructions are case insensitive)
