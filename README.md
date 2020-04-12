@@ -8,23 +8,27 @@ Pressing 'space' will reload the file and redraw the instructions
 
  - Movements
 
-        FORWARD N   # goes forward by N pixels, can be shorten to FD N
-        BACKWARD N  # goes backward by N pixels, can be shorten to BD N
+        FORWARD N   # goes forward N pixels, can be shorten to FD N
+        BACKWARD N  # goes backward N pixels, can be shorten to BD N
         SETXY X Y   # move the turtle to the position (X, Y)
  - Rotations
 
-        RIGHT A    # turn right by A degrees, can be shorten to RT A
-        LEFT -A    # turn left by -A degrees, can be shorten to LT -A
+        RIGHT A         # turn right A degrees, can be shorten to RT A
+        LEFT A          # turn left A degrees, can be shorten to LT A
+        SETHEADING X    # set heading to X degrees (anticlockwise with 0=east)
+        SETHEADING N    # set heading to North (valid with NSEW)
  - Loops
 
         REPEAT N [FD 10 RT 60]  # repeat the instructions between brackets N times
  - States
 
-        PENUP   # stop recording the path (don't erase the previous), can be shorten to PU
-        PENDOWN # start recording the path, can be shorten to DP
+        PENUP   # stop path recording path, can be shorten to PU
+        PENDOWN # resume path recording, can be shorten to DP
  - Other
 
-        # one line comment, everything until newline don't affect the program
+        RANDOM N            # a random integer between 0 and N (included)
+        RANDOM A B          # a random integer between A and B (included)
+        # one line comment, everything after don't affect the program
         #*
         multiline comment
         *#
@@ -35,27 +39,33 @@ Pressing 'space' will reload the file and redraw the instructions
         END                         # end of the procedure
         DOTTED_LINE                 # a call of the procedure
         
-        TO TRIANGLE :L          # this one has an argument (they must be space separated)
-        REPEAT 3 [FD L RT 120]  
+        TO TRIANGLE :L :A :B        # this procedure has three parameters
+        REPEAT 3 [FD :L RT 120]     # parameters are prefixed with ":"
         END                     
-        TRIANGLE 30             # will execute: REPEAT 3 [FD 30 RT 120]
+        TRIANGLE 30                 # will execute: REPEAT 3 [FD 30 RT 120]
  - Not implemented yet
 
-        RANDOM N            # a random integer between 0 and N (included)
-        RANDOM A B          # a random integer between A and B (included)
-        SETHEADING X        # set the heading to X (counterclockwise with 0 to the right)
+        SETPENCOLOR R G B       # change the color to RGB (3 integers <256 or 3 floats <1)
+        SETBGCOLOR R G B        # change the background color
 
 ## TODO
- - A set heading keyword with an angle or NSEW
- - A random keyword
- - Allow rithmetic operation "+-*/()" (with regex ???)
+ - Allow arithmetic operation "+-*/()" (with regex ???)
  - A set pen color keyword with RGB as arguments
  - Animate the turtle !!!
  - A clear screen keyword
  - A wait keyword to control the animation
 
 ## Updates
+
+### 12/04/2020
+ - Custom exceptions in separated file
+ - Every parameter of procedure should be prefixed with ":"
+ - Supports floating point numbers
+ - Handle bracket exception with "repeat"
+ - New keyword : RANDOM
+ - New keyword : SETHEADING (or SH)
+
 ### 11/04/2020
-    - Exception handling
-    - Automatically draw when the file is modified
-    - Allow lowercase (the whole instructions are case insensitive)
+ - Exception handling
+ - Automatically draw when the file is modified
+ - Allow lowercase (the whole instructions are case insensitive)
