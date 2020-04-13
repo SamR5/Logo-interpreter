@@ -12,10 +12,10 @@ REPEAT 4 [FD 100 RT 90]
 END
 
 PU SETXY 100 100 PD
-REPEAT 20 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
+REPEAT 10 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
 
 PU SETXY -100 -100 PD
-REPEAT 4 [DOTTED_LINE 4 4 10 RT 80]
+REPEAT 2 [DOTTED_LINE 4 4 10 RT 80]
 
 
 
@@ -25,7 +25,7 @@ TO rand_path :len :steps
 repeat :steps [fd :len rt random 360]
 END
 
-repeat 10 [rand_path 4 20 FD 80]
+repeat 5 [rand_path 4 20 FD 80]
 
 to leaf :size
 repeat 60 [FD :size RT 2]

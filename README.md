@@ -5,7 +5,7 @@ Enter your commands in the "instructions.txt" file, save and run the program
 Pressing 'space' will reload the file and redraw the instructions  
 
 ## List of instructions
-
+##### *The instructions here are in uppercase but can be lowercase, the text is case insensitive.*  
  - Movements
 
         FORWARD N   # goes forward N pixels, can be shorten to FD N
@@ -45,17 +45,23 @@ Pressing 'space' will reload the file and redraw the instructions
         TRIANGLE 30                 # will execute: REPEAT 3 [FD 30 RT 120]
  - Not implemented yet
 
-        SETPENCOLOR R G B       # change the color to RGB (3 integers <256 or 3 floats <1)
-        SETBGCOLOR R G B        # change the background color
+        SETPENCOLOR R G B       # change the pen color (3 integers <256)
+        SETBGCOLOR R G B        # change the background color (3 integers <256)
+        CLEARSCREEN or CS       # clear the screen
+        SETSPEED                # set the speed of the animation in pixels per frame (fixed at 40 FPS)
+        WAIT N                  # wait N seconds
 
 ## TODO
  - Allow arithmetic operation "+-*/()" (with regex ???)
  - A set pen color keyword with RGB as arguments
- - Animate the turtle !!!
  - A clear screen keyword
  - A wait keyword to control the animation
 
 ## Updates
+
+### Next update
+ - The drawing is animated
+ - Press the spacebar to reset or enter to go to the end
 
 ### 12/04/2020
  - Custom exceptions in separated file

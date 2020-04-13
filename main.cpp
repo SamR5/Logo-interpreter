@@ -25,7 +25,7 @@ Parse the instructions in instructions.txt and draw
 
 #define WIDTH 800
 #define HEIGHT 600
-#define FPS 60
+#define FPS 40
 #define PI 3.1415926
 #define DEG2RAD PI/180.0
 
@@ -45,6 +45,10 @@ void to_mainSet();
 bool extract_functions(VecStr set);
 bool move_turtle(VecStr set, Turtle& T); // return false on exception
 void reset();
+// -1 is for initialization, 0 resets all lines to 0 and 1 for all lines drawn
+void reset_draw_state(int state);
+float distance(float dx, float dy);
+pair2f draw_line(float x1, float y1, float x2, float y2, float ratio);
 
 void display_callback();
 void reshape_callback(int width, int height);
@@ -60,6 +64,10 @@ std::string mainInstructions;
 VecStr mainSet;
 std::vector<pair2f> path;
 std::vector<std::vector<pair2f>> paths;
+// stores the state of each line of each path 0 is not drawn, 1 is complete line
+// and the values in between are the ratios of the line drawn (to simulate movement)
+std::vector<std::vector<float>> toDraw;
+float speed; // speed of the turtle in pixels per frame
 
 struct Turtle {
     float x;
@@ -148,6 +156,8 @@ void init() {
     glClearColor(0.2, 0.3, 0.4, 1.0);
     srand(time(0));
     reset();
+    reset_draw_state(-1);
+    speed = 10;
 }
 
 bool is_number(std::string s) {
@@ -278,7 +288,8 @@ bool move_turtle(VecStr set, Turtle& T) {
             while (set[i+1+rndCount] == "RANDOM") { // process all following randoms
             //if (set[i+1] == "RANDOM") {
                 if (is_number(set[i+2+rndCount]) && is_number(set[i+3+rndCount])) {
-                    float f = random_range(to_number(set[i+2+rndCount]), to_number(set[i+3+rndCount]));
+                    float f = random_range(to_number(set[i+2+rndCount]),
+                                           to_number(set[i+3+rndCount]));
                     set[i+1+rndCount] = std::to_string(f);
                     set.erase(set.begin()+i+2+rndCount);
                     set.erase(set.begin()+i+2+rndCount); // same index because the end is offset
@@ -427,6 +438,50 @@ void reset() {
     mainT.up(); // saves the last path
 }
 
+void reset_draw_state(int state) {
+    for (size_t p=0; p<paths.size(); p++) {
+        if (state==-1) {
+            toDraw.push_back({});
+        }
+        for (size_t q=0; q<paths[p].size()-1; q++) {
+            if (state==-1) {
+                toDraw[p].push_back(0);
+            } else {
+                toDraw[p][q] = state;
+            }
+        }
+    }
+}
+
+float distance(float dx, float dy) {
+    return std::sqrt(dx*dx + dy*dy);
+}
+
+pair2f draw_line(float x1, float y1, float x2, float y2, float ratio) {
+    float dx = x2-x1;
+    float dy = y2-y1;
+    float dist = distance(dx, dy);
+    float xt, yt; // intermediate value
+    float toTravel = speed;
+    if (ratio >= 1) {
+        glBegin(GL_LINE_STRIP);
+          glVertex2f(x1, y1);
+          glVertex2f(x2, y2);
+        glEnd();
+        return {0, dist};
+    } else {
+        xt = x1+dx*std::min(ratio+toTravel/dist, 1.0f);
+        yt = y1+dy*std::min(ratio+toTravel/dist, 1.0f);
+        glBegin(GL_LINE_STRIP);
+          glVertex2f(x1, y1);
+          glVertex2f(xt, yt);
+        glEnd();
+    }
+    // distance to new point - distance already traveled = distance traveled
+    // return total distance traveled, total distance
+    return {distance(xt-x1, yt-y1) - dist*ratio, dist};
+}
+
 void display_callback() {
     glClear(GL_COLOR_BUFFER_BIT); // clear screen
     // red cross on the center
@@ -435,15 +490,37 @@ void display_callback() {
       glVertex2f(-6, 0); glVertex2f(5, 0);
       glVertex2f(0, -5); glVertex2f(0, 6);
     glEnd();
+    
     glColor3f(1, 1, 1);
-    for (std::vector<pair2f> p : paths) {
-        glBegin(GL_LINE_STRIP);
-        for (size_t i=0; i<p.size(); i++) {
-            glVertex2f(p[i].first, p[i].second);
+    pair2f p1, p2; // points
+    float d(0); // distance traveled
+    pair2f temp; // to store (dist traveled, total dist) returned by draw_line
+    // 1 call of the funtion per frame so the distance to travel is the speed
+    float toTravel(speed);
+    for (size_t i=0; i<toDraw.size(); i++) {
+        for (size_t j=0; j<toDraw[i].size(); j++) {
+            p1 = paths[i][j];
+            p2 = paths[i][j+1];
+            if (p1==p2) { // bug inf loop if same points
+                continue;
+            }
+            if (toDraw[i][j] >= 1) { // draw the whole line
+                draw_line(p1.first, p1.second, p2.first, p2.second, 1);
+            } else {
+                temp = draw_line(p1.first, p1.second, p2.first, p2.second, toDraw[i][j]);
+                d += temp.first;
+                toDraw[i][j] += temp.first/temp.second; // ratio traveled/total
+                if (d<toTravel) {
+                    j--; // will recheck the current in case not fully drawn
+                    continue;
+                } else {
+                    glutSwapBuffers();
+                    return;
+                }
+            }
         }
-        glEnd();
     }
-    glutSwapBuffers(); // display / update
+    glutSwapBuffers();
 }
 
 void reshape_callback(int width, int height) {
@@ -458,6 +535,8 @@ void timer_callback(int) {
     glutPostRedisplay(); // run the display_callback function
     if (fparse::check_change(mainInstructions)) {
         reset();
+        toDraw.clear();
+        reset_draw_state(-1);
     }
     glutTimerFunc(1000/FPS, timer_callback, 0);
 }
@@ -465,7 +544,12 @@ void timer_callback(int) {
 void keyboard_callback(unsigned char key, int x, int y) {
     if (key==' ') {
         reset();
+        reset_draw_state(0);
+    } else if (key==13) {
+        reset();
+        reset_draw_state(1);
     }
+    //std::cout << (int)key << std::endl;
 }
 
 int main(int argc, char **argv) {
