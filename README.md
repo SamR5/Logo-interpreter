@@ -59,9 +59,8 @@ Pressing 'space' will reload the file and redraw the instructions
 
 ## Updates
 
-### Next update
+### 14/04/2020
  - Handle arithmetic operations +-*/()
-
 
 ### 13/04/2020
  - The drawing is animated
