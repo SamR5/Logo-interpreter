@@ -48,4 +48,10 @@ class BracketNotMatching : public std::exception {
       const char* what();
 };
 
+class UselessNumber : public std::exception {
+    public:
+      UselessNumber();
+      const char* what();
+};
+
 #endif // CUSTOM_EXCEPTION_H

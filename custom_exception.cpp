@@ -59,3 +59,9 @@ const char* BracketNotMatching::what() {
         return "Bracket not opened";
     }
 }
+
+UselessNumber::UselessNumber() {}
+
+const char* UselessNumber::what() {
+    return "Isolated number";
+}

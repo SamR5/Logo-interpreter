@@ -30,6 +30,7 @@ Parse the instructions in instructions.txt and draw
 #define DEG2RAD PI/180.0
 
 typedef std::pair<float, float> pair2f;
+typedef std::pair<int, int> pair2i;
 typedef std::vector<std::string> VecStr;
 
 struct Turtle;
@@ -40,9 +41,10 @@ void init();
 bool is_number(std::string s);
 float to_number(std::string s);
 int random_range(int a, int b);
-
 void to_mainSet();
 bool extract_functions(VecStr set);
+int apply_operator(VecStr& set, char op);
+int apply_arithmetics(VecStr& set);
 bool move_turtle(VecStr set, Turtle& T); // return false on exception
 void reset();
 // -1 is for initialization, 0 resets all lines to 0 and 1 for all lines drawn
@@ -59,7 +61,8 @@ VecStr longNames = {"FORWARD", "BACKWARD", "RIGHT", "LEFT", "PENUP", "PENDOWN",
                     "SETXY", "REPEAT", "RANDOM", "SETHEADING"};
 VecStr shortNames = {"FD", "BD", "RT", "LT", "PU", "PD",
                      "SETXY", "REPEAT", "RANDOM", "SH"};
-
+const char* operators = "+-*/";
+const char* brackets = "[]()";
 std::string mainInstructions;
 VecStr mainSet;
 std::vector<pair2f> path;
@@ -143,8 +146,7 @@ struct Function {
         std::cout << "parameters: ";
         for (auto i : parameters)
             std::cout << i << " ";
-        std::cout << std::endl;
-        std::cout << "instructions: ";
+        std::cout << "\ninstructions: ";
         for (auto i : funcInstructions)
             std::cout << i << " ";
         std::cout << std::endl;
@@ -204,23 +206,51 @@ int random_range(int a, int b) {
     return a + rand()%(b-a);
 }
 
-
-
 void to_mainSet() {
     std::string s;
-    //bool nextLineIsEndOfArg(false);
     for (size_t i=0; i<mainInstructions.length(); i++) {
         if (mainInstructions[i] != ' ' && mainInstructions[i] != '\n') {
-            if (mainInstructions[i] == '[') {
-                mainSet.push_back("[");
-            } else if (mainInstructions[i] == ']') {
+            // if there is a bracket, separate it from the other
+            if (*std::find(brackets, brackets+4, mainInstructions[i]) != '\0') {
                 if (s!="" && s!=" ")
                     mainSet.push_back(s);
-                mainSet.push_back("]");
+                std::string ss;
+                ss += mainInstructions[i];
+                mainSet.push_back(ss);
                 s.clear();
-            } else if (mainInstructions[i] == ':') {
+            } else if (mainInstructions[i] == ':') { // the end of arguments will be known after '\n'
                 s += mainInstructions[i];
-            } else {
+            } // if there is an operator sign, separate it from others
+            else if (*std::find(operators, operators+4, mainInstructions[i]) != '\0') {
+                if ((is_number(s) && s!="") || s[0]==':') { // if number or the parameter of a function
+                    if (s!="")
+                        mainSet.push_back(s);
+                    std::string ss;
+                    ss += mainInstructions[i];
+                    mainSet.push_back(ss);
+                    s.clear();
+                } // in case there is A*-1 or A+-2
+                else if (*std::find(operators, operators+4, mainSet.back().back()) != '\0' ||
+                         *std::find(brackets, brackets+4, mainSet.back().back()) != '\0') {
+                    if (mainInstructions[i]=='-') {
+                        s += mainInstructions[i];
+                    } else if (s!="") {
+                        std::cout << s << "e\n";
+                        mainSet.push_back(s);
+                        s.clear();
+                        s += mainInstructions[i];
+                    } else {
+                        s += mainInstructions[i];
+                        mainSet.push_back(s);
+                        s.clear();
+                    }
+                } else {
+                    std::cout << "eee\n";
+                    mainSet.push_back(" ");
+                    s += mainInstructions[i];
+                }
+            }
+            else {
                 s += mainInstructions[i];
             }
         } else {
@@ -280,29 +310,198 @@ bool extract_functions(VecStr set) {
     return true;
 }
 
+int apply_operator(VecStr& set, char op) {
+    bool change(false);
+    for (int i=0; i<set.size()-2; i++) {
+        if (is_number(set[i]) && is_number(set[i+2])) {
+            if (set[i+1].size()==1 && set[i+1][0]==op) {
+                if (op=='/' && to_number(set[i+2]) == 0)
+                    return i;
+                switch (op) {
+                    case '/': set[i] = std::to_string(to_number(set[i])/to_number(set[i+2])); break;
+                    case '*': set[i] = std::to_string(to_number(set[i])*to_number(set[i+2])); break;
+                    case '-': set[i] = std::to_string(to_number(set[i])-to_number(set[i+2])); break;
+                    case '+': set[i] = std::to_string(to_number(set[i])+to_number(set[i+2])); break;
+                }
+                set.erase(set.begin()+i+2); // erase the second number
+                set.erase(set.begin()+i+1); // erase the operator
+                change = true;
+            }
+        }
+    }
+    if (change) {
+        return -1;
+    }
+    return -2;
+}
+
+int apply_arithmetics(VecStr& set) {
+    bool change(false);
+    std::cout << "old: ";
+    for (auto i : set) {
+        std::cout << i << " ";
+    } std::cout << "\n";
+    for (int i=0; i<set.size()-2; i++) {
+        if (set[i]=="(" && set[i+2]==")") {
+            set.erase(set.begin()+i+2); // erase the second parenthesis
+            set.erase(set.begin()+i); // erase the first parenthesis
+            change=true;
+        }
+    }
+    if (change) {
+        return apply_arithmetics(set);
+    }
+    
+    int error(-1); // -2 = changes happened, -1 = no change and >0 is the index of the error
+    const char* oper = "/*-+";
+    int current;
+    for (int i=0; i<4; i++) {
+        current = i;
+        while (error==-1) {
+            error = apply_operator(set, oper[i]);
+            if (error==-1) {
+                change = true;
+                i = current-1; // will add 1 next loop
+            }
+        }
+        if (error!=-2)
+            return error;
+        error = -1;
+    }
+    return -1;
+    /* old version
+    //int error(-1); // -2 = changes happened, -1 = no change and >0 is the index of the error
+    while (error==-1) {
+        error = apply_operator(set, '/');
+        if (error==-1) {
+            change = true;
+        }
+    }
+    if (error!=-2)
+        return error;
+    error = -1;
+    while (error==-1) {
+        error = apply_operator(set, '*');
+        if (error==-1) {
+            change = true;
+        }
+    }
+    if (error!=-2)
+        return error;
+    error = -1;
+    while (error==-1) {
+        error = apply_operator(set, '-');
+        if (error==-1) {
+            change = true;
+        }
+    }
+    if (error!=-2)
+        return error;
+    error = -1;
+    while (error==-1) {
+        error = apply_operator(set, '+');
+        if (error==-1) {
+            change = true;
+        }
+    }
+    if (error!=-2)
+        return error;
+    return -1;
+    */
+    /*old version
+    for (int i=0; i<set.size()-2; i++) {
+        if (is_number(set[i]) && is_number(set[i+2])) {
+            if (set[i+1]=="/") {
+                if (to_number(set[i+2]) == 0) {
+                    return i;
+                }
+                set[i] = std::to_string(to_number(set[i]) / to_number(set[i+2]));
+                set.erase(set.begin()+i+2); // erase the second number
+                set.erase(set.begin()+i+1); // erase the operator
+                change = true;
+            }
+        }
+    }
+    if (change) {
+        return apply_arithmetics(set);
+    }
+    for (int i=0; i<set.size()-2; i++) {
+        if (is_number(set[i]) && is_number(set[i+2])) {
+            if (set[i+1]=="*") {
+                set[i] = std::to_string(to_number(set[i]) * to_number(set[i+2]));
+                set.erase(set.begin()+i+2); // erase the second number
+                set.erase(set.begin()+i+1); // erase the operator
+                change = true;
+            }
+        }
+    }
+    if (change) {
+        return apply_arithmetics(set);
+    }
+    for (int i=0; i<set.size()-2; i++) {
+        if (is_number(set[i]) && is_number(set[i+2])) {
+            if (set[i+1]=="-") {
+                set[i] = std::to_string(to_number(set[i]) - to_number(set[i+2]));
+                set.erase(set.begin()+i+2); // erase the second number
+                set.erase(set.begin()+i+1); // erase the operator
+                change = true;
+            }
+        }
+    }
+    if (change) {
+        return apply_arithmetics(set);
+    }
+    for (int i=0; i<set.size()-2; i++) {
+        if (is_number(set[i]) && is_number(set[i+2])) {
+            if (set[i+1]=="+") {
+                set[i] = std::to_string(to_number(set[i]) + to_number(set[i+2]));
+                set.erase(set.begin()+i+2); // erase the second number
+                set.erase(set.begin()+i+1); // erase the operator
+                change = true;
+            }
+        }
+    }
+    if (change) {
+        return apply_arithmetics(set);
+    }
+    std::cout << "new: ";
+    for (auto i : set) {
+        std::cout << i << " ";
+    } std::cout << "\n\n";
+    return -1;
+    */
+}
+
 bool move_turtle(VecStr set, Turtle& T) {
     size_t i; // to use it after if exception
+//    for (auto j : set) {
+//        std::cout << j << '\\';
+//    } std::cout << std::endl;
     try {
         for (i=0; i<set.size()-1; i++) {
+            std::cout << i << std::endl;
             int rndCount(0);
             while (set[i+1+rndCount] == "RANDOM") { // process all following randoms
-            //if (set[i+1] == "RANDOM") {
                 if (is_number(set[i+2+rndCount]) && is_number(set[i+3+rndCount])) {
                     float f = random_range(to_number(set[i+2+rndCount]),
                                            to_number(set[i+3+rndCount]));
                     set[i+1+rndCount] = std::to_string(f);
-                    set.erase(set.begin()+i+2+rndCount);
-                    set.erase(set.begin()+i+2+rndCount); // same index because the end is offset
+                    set.erase(set.begin()+i+3+rndCount); // erase second arg
+                    set.erase(set.begin()+i+2+rndCount); // erase first arg
                 } else if (is_number(set[i+2+rndCount]) && !is_number(set[i+3+rndCount])) {
                     float f = random_range(0, to_number(set[i+2+rndCount]));
                     set[i+1+rndCount] = std::to_string(f);
-                    set.erase(set.begin()+i+2+rndCount);
+                    set.erase(set.begin()+i+2+rndCount); // erase first arg
                 } else {
                     std::cout << "nope\n";
                     //throw 
                 }
                 rndCount++;
-                //std::cout << rndCount << set[i+1+rndCount] << std::endl;
+            }
+            int result = apply_arithmetics(set);
+            if (result!=-1) { // return -1 when ok otherwise the index of the problem
+                i += result;
+                throw std::invalid_argument("arithmetics");
             }
             // apply arithmetics after randoms are generated
             if (set[i] == "FD") {
@@ -398,6 +597,11 @@ bool move_turtle(VecStr set, Turtle& T) {
             } else if (set[i] != "]" && set[i] != "[" && set[i] != " " && !is_number(set[i])) {
                 std::vector<char> buffer(set[i].begin(), set[i].end());
                 throw UnknownName(&buffer[0]);
+            } else if ((set[i] == "[" && is_number(set[i+1])) ||
+                       (set[i] == "]" && is_number(set[i+1]))) {
+                throw UselessNumber();
+            } else {
+                
             }
         }
     } catch (const std::invalid_argument& ia) {
@@ -411,6 +615,19 @@ bool move_turtle(VecStr set, Turtle& T) {
             std::cerr << set[i+x] << " ";
         }
         std::cerr << std::endl;
+        return false;
+    } catch (UselessNumber& un) {
+        for (auto j : set) {
+            std::cout << j << std::endl;
+        }
+        std::cerr << "Error (" << un.what() << ") >> ";
+        std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
+        return false;
+    } catch (std::logic_error& le) {
+        std::cerr << le.what() << std::endl << i << std::endl;
+        for (auto j : set) {
+            std::cerr << j << '-';
+        } std::cerr << std::endl;
         return false;
     }
     return true;

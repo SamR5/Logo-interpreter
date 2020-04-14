@@ -12,5 +12,10 @@ file_parse.o: file_parse.cpp
 main.o: main.cpp
 	g++ -o main.o -c main.cpp -std=c++11 -O3
 
+debug: main.o custom_exception.o file_parse.o
+	g++ -o Logo_interpreter_db main.o custom_exception.o file_parse.o -lGL -lGLU -lglut -g
+	gdb ./Logo_interpreter_db
+	rm -f Logo_interpreter_db core
+
 clean:
 	rm -f *.o core
