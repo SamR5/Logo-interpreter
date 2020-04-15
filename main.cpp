@@ -8,9 +8,7 @@ Parse the instructions in instructions.txt and draw
 
 #include <GL/gl.h>
 #include <GL/glut.h>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <cmath>
@@ -19,7 +17,6 @@ Parse the instructions in instructions.txt and draw
 #include <algorithm>
 #include <ctime>
 #include <random>
-#include <thread>
 #include "custom_exception.h"
 #include "file_parse.h"
 
@@ -49,6 +46,7 @@ bool move_turtle(VecStr set, Turtle& T); // return false on exception
 void reset();
 // -1 is for initialization, 0 resets all lines to 0 and 1 for all lines drawn
 void reset_draw_state(int state);
+void delete_paths(size_t i, size_t j); // in case of keyword cs
 float distance(float dx, float dy);
 pair2f draw_line(float x1, float y1, float x2, float y2, float ratio);
 
@@ -58,9 +56,9 @@ void timer_callback(int);
 void keyboard_callback(unsigned char key, int x, int y);
 
 VecStr longNames = {"FORWARD", "BACKWARD", "RIGHT", "LEFT", "PENUP", "PENDOWN",
-                    "SETXY", "REPEAT", "RANDOM", "SETHEADING"};
+                    "SETXY", "REPEAT", "RANDOM", "SETHEADING", "CLEARSCREEN"};
 VecStr shortNames = {"FD", "BD", "RT", "LT", "PU", "PD",
-                     "SETXY", "REPEAT", "RANDOM", "SH"};
+                     "SETXY", "REPEAT", "RANDOM", "SH", "CS"};
 const char* operators = "+-*/";
 const char* brackets = "[]()";
 std::string mainInstructions;
@@ -70,6 +68,9 @@ std::vector<std::vector<pair2f>> paths;
 // stores the state of each line of each path 0 is not drawn, 1 is complete line
 // and the values in between are the ratios of the line drawn (to simulate movement)
 std::vector<std::vector<float>> toDraw;
+// true to display and false to skip
+// used for clearscreen command to hide everything past
+std::vector<pair2i> cls;
 float speed; // speed of the turtle in pixels per frame
 
 struct Turtle {
@@ -97,6 +98,8 @@ struct Turtle {
         return lt(-value);
     }
     void up() {
+        if (!isDown) // bug with one point path
+            return;
         isDown = false;
         if (savePath) {
             paths.push_back(path);
@@ -104,6 +107,8 @@ struct Turtle {
         }
     }
     void down() {
+        if (isDown) // bug with one point path
+            return;
         isDown = true;
         if (savePath) {
             path.push_back({x, y});
@@ -121,6 +126,11 @@ struct Turtle {
         while (angle<0) {angle += 360;}
         while (angle>360) {angle -= 360;}
     }
+    void clear_screen() {
+        if (savePath) {
+            cls.push_back({paths.size(), path.size()-1});
+        }
+    }
 } mainT;
 
 struct Function {
@@ -129,7 +139,7 @@ struct Function {
     VecStr get_instructions(VecStr arguments) {
         VecStr newInstructions = funcInstructions;
         for (std::size_t i=0; i<arguments.size(); i++) {
-            std::replace(newInstructions.begin(), newInstructions.end(), 
+            std::replace(newInstructions.begin(), newInstructions.end(),
                          parameters[i], arguments[i]);
         }
         return newInstructions;
@@ -159,7 +169,7 @@ void init() {
     srand(time(0));
     reset();
     reset_draw_state(-1);
-    speed = 10;
+    speed = 2;
 }
 
 bool is_number(std::string s) {
@@ -214,9 +224,9 @@ void to_mainSet() {
             if (*std::find(brackets, brackets+4, mainInstructions[i]) != '\0') {
                 if (s!="" && s!=" ")
                     mainSet.push_back(s);
-                std::string ss;
-                ss += mainInstructions[i];
-                mainSet.push_back(ss);
+                s.clear();
+                s += mainInstructions[i];
+                mainSet.push_back(s);
                 s.clear();
             } else if (mainInstructions[i] == ':') { // the end of arguments will be known after '\n'
                 s += mainInstructions[i];
@@ -225,9 +235,9 @@ void to_mainSet() {
                 if ((is_number(s) && s!="") || s[0]==':') { // if number or the parameter of a function
                     if (s!="")
                         mainSet.push_back(s);
-                    std::string ss;
-                    ss += mainInstructions[i];
-                    mainSet.push_back(ss);
+                    s.clear();
+                    s += mainInstructions[i];
+                    mainSet.push_back(s);
                     s.clear();
                 } // in case there is A*-1 or A+-2
                 else if (*std::find(operators, operators+4, mainSet.back().back()) != '\0' ||
@@ -245,8 +255,6 @@ void to_mainSet() {
                         s.clear();
                     }
                 } else {
-                    std::cout << "eee\n";
-                    mainSet.push_back(" ");
                     s += mainInstructions[i];
                 }
             }
@@ -254,11 +262,8 @@ void to_mainSet() {
                 s += mainInstructions[i];
             }
         } else {
-            if (s!="") {
+            if (s!="" && s!=" ") {
                 mainSet.push_back(s);
-                if (s==" ") {
-                    std::cout << "eee\n";
-                }
             }
             s.clear();
         }
@@ -337,10 +342,6 @@ int apply_operator(VecStr& set, char op) {
 
 int apply_arithmetics(VecStr& set) {
     bool change(false);
-    std::cout << "old: ";
-    for (auto i : set) {
-        std::cout << i << " ";
-    } std::cout << "\n";
     for (int i=0; i<set.size()-2; i++) {
         if (set[i]=="(" && set[i+2]==")") {
             set.erase(set.begin()+i+2); // erase the second parenthesis
@@ -369,117 +370,12 @@ int apply_arithmetics(VecStr& set) {
         error = -1;
     }
     return -1;
-    /* old version
-    //int error(-1); // -2 = changes happened, -1 = no change and >0 is the index of the error
-    while (error==-1) {
-        error = apply_operator(set, '/');
-        if (error==-1) {
-            change = true;
-        }
-    }
-    if (error!=-2)
-        return error;
-    error = -1;
-    while (error==-1) {
-        error = apply_operator(set, '*');
-        if (error==-1) {
-            change = true;
-        }
-    }
-    if (error!=-2)
-        return error;
-    error = -1;
-    while (error==-1) {
-        error = apply_operator(set, '-');
-        if (error==-1) {
-            change = true;
-        }
-    }
-    if (error!=-2)
-        return error;
-    error = -1;
-    while (error==-1) {
-        error = apply_operator(set, '+');
-        if (error==-1) {
-            change = true;
-        }
-    }
-    if (error!=-2)
-        return error;
-    return -1;
-    */
-    /*old version
-    for (int i=0; i<set.size()-2; i++) {
-        if (is_number(set[i]) && is_number(set[i+2])) {
-            if (set[i+1]=="/") {
-                if (to_number(set[i+2]) == 0) {
-                    return i;
-                }
-                set[i] = std::to_string(to_number(set[i]) / to_number(set[i+2]));
-                set.erase(set.begin()+i+2); // erase the second number
-                set.erase(set.begin()+i+1); // erase the operator
-                change = true;
-            }
-        }
-    }
-    if (change) {
-        return apply_arithmetics(set);
-    }
-    for (int i=0; i<set.size()-2; i++) {
-        if (is_number(set[i]) && is_number(set[i+2])) {
-            if (set[i+1]=="*") {
-                set[i] = std::to_string(to_number(set[i]) * to_number(set[i+2]));
-                set.erase(set.begin()+i+2); // erase the second number
-                set.erase(set.begin()+i+1); // erase the operator
-                change = true;
-            }
-        }
-    }
-    if (change) {
-        return apply_arithmetics(set);
-    }
-    for (int i=0; i<set.size()-2; i++) {
-        if (is_number(set[i]) && is_number(set[i+2])) {
-            if (set[i+1]=="-") {
-                set[i] = std::to_string(to_number(set[i]) - to_number(set[i+2]));
-                set.erase(set.begin()+i+2); // erase the second number
-                set.erase(set.begin()+i+1); // erase the operator
-                change = true;
-            }
-        }
-    }
-    if (change) {
-        return apply_arithmetics(set);
-    }
-    for (int i=0; i<set.size()-2; i++) {
-        if (is_number(set[i]) && is_number(set[i+2])) {
-            if (set[i+1]=="+") {
-                set[i] = std::to_string(to_number(set[i]) + to_number(set[i+2]));
-                set.erase(set.begin()+i+2); // erase the second number
-                set.erase(set.begin()+i+1); // erase the operator
-                change = true;
-            }
-        }
-    }
-    if (change) {
-        return apply_arithmetics(set);
-    }
-    std::cout << "new: ";
-    for (auto i : set) {
-        std::cout << i << " ";
-    } std::cout << "\n\n";
-    return -1;
-    */
 }
 
 bool move_turtle(VecStr set, Turtle& T) {
-    size_t i; // to use it after if exception
-//    for (auto j : set) {
-//        std::cout << j << '\\';
-//    } std::cout << std::endl;
+    size_t i; // to use it after in case of exception
     try {
         for (i=0; i<set.size()-1; i++) {
-            std::cout << i << std::endl;
             int rndCount(0);
             while (set[i+1+rndCount] == "RANDOM") { // process all following randoms
                 if (is_number(set[i+2+rndCount]) && is_number(set[i+3+rndCount])) {
@@ -515,28 +411,22 @@ bool move_turtle(VecStr set, Turtle& T) {
             } else if (set[i] == "REPEAT") {
                 int count(-1); // to count '[]' in case they are nested
                 int toSkip(0); // items to skip depending on the length
-                try {
-                    if (set[i+2]!="[") {
-                        throw BracketNotMatching(1);
+                if (set[i+2]!="[") {
+                    throw BracketNotMatching(1);
+                }
+                for (size_t j=i+3; j<set.size(); j++) {
+                    if (set[j] == "[") {
+                        count--;
+                    } else if (set[j] == "]") {
+                        count++;
                     }
-                    for (size_t j=i+3; j<set.size(); j++) {
-                        if (set[j] == "[") {
-                            count--;
-                        } else if (set[j] == "]") {
-                            count++;
-                        }
-                        toSkip++;
-                        if (count==0) {
-                            break;
-                        }
+                    toSkip++;
+                    if (count==0) {
+                        break;
                     }
-                    if (count!=0) {
-                        throw BracketNotMatching(count);
-                    }
-                } catch (BracketNotMatching& bnm) {
-                    std::cerr << "Error (" << bnm.what() << ") >> ";
-                    std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
-                    return false;
+                }
+                if (count!=0) {
+                    throw BracketNotMatching(count);
                 }
                 // the +3 is to skip the "repeat N ["
                 VecStr subset(set.begin()+i+3, set.begin()+i+3+toSkip);
@@ -566,26 +456,18 @@ bool move_turtle(VecStr set, Turtle& T) {
             } else if (functions.find(set[i]) != functions.end()) { // if the procedure is known
                 auto f = functions.find(set[i]);
                 VecStr args;
-                try {
-                    for (size_t arg=0; arg<f->second.parameters.size(); arg++) {
-                        args.push_back(set[i+1+arg]);
-                    }
-                    if (!f->second.is_valid(args)) {
-                        std::vector<char> buffer(set[i].begin(), set[i].end());
-                        //throw InvalidArgToFunction(&buffer[0], args);
-                        throw InvalidArgToFunction(f->first, f->second.parameters, args);
-                    }
-                    if (!move_turtle(f->second.get_instructions(args), T)) {
-                        return false;
-                    }
-                    i += f->second.parameters.size();
-                } catch (InvalidArgToFunction& iatf) {
-                    std::cerr << "Error (" << iatf.what() << ") >> " << f->first << std::endl;
-                    std::cerr << "Name: " << f->first << std::endl;
-                    std::cerr << "Parameters: " << iatf.get_param_str() << std::endl;
-                    std::cerr << "Arguments: " << iatf.get_args_str() << std::endl;
+                for (size_t arg=0; arg<f->second.parameters.size(); arg++) {
+                    args.push_back(set[i+1+arg]);
+                }
+                if (!f->second.is_valid(args)) {
+                    std::vector<char> buffer(set[i].begin(), set[i].end());
+                    //throw InvalidArgToFunction(&buffer[0], args);
+                    throw InvalidArgToFunction(f->first, f->second.parameters, args);
+                }
+                if (!move_turtle(f->second.get_instructions(args), T)) {
                     return false;
                 }
+                i += f->second.parameters.size();
             } else if (set[i] == "SH") { // set heading
                 int val;
                 if (set[i+1] == "N") {val = 90;}
@@ -594,6 +476,8 @@ bool move_turtle(VecStr set, Turtle& T) {
                 else if (set[i+1] == "W") {val = 180;}
                 else {val = to_number(set[i+1]);}
                 T.set_heading(val); i++;
+            } else if (set[i] == "CS") {
+                T.clear_screen();
             } else if (set[i] != "]" && set[i] != "[" && set[i] != " " && !is_number(set[i])) {
                 std::vector<char> buffer(set[i].begin(), set[i].end());
                 throw UnknownName(&buffer[0]);
@@ -617,9 +501,6 @@ bool move_turtle(VecStr set, Turtle& T) {
         std::cerr << std::endl;
         return false;
     } catch (UselessNumber& un) {
-        for (auto j : set) {
-            std::cout << j << std::endl;
-        }
         std::cerr << "Error (" << un.what() << ") >> ";
         std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
         return false;
@@ -628,6 +509,15 @@ bool move_turtle(VecStr set, Turtle& T) {
         for (auto j : set) {
             std::cerr << j << '-';
         } std::cerr << std::endl;
+        return false;
+    } catch (BracketNotMatching& bnm) {
+        std::cerr << "Error (" << bnm.what() << ") >> ";
+        std::cerr << set[i] << " " << set[i+1] << " " << set[i+2] << std::endl;
+        return false;
+    } catch (InvalidArgToFunction& iatf) {
+        std::cerr << "Error (" << iatf.what() << ") >> " << iatf.get_name() << std::endl;
+        std::cerr << "Parameters: " << iatf.get_param_str() << std::endl;
+        std::cerr << "Arguments: " << iatf.get_args_str() << std::endl;
         return false;
     }
     return true;
@@ -638,6 +528,7 @@ void reset() {
     mainSet.clear();
     path.clear();
     paths.clear();
+    cls.clear();
     functions.clear();
     mainT.x = mainT.y = 0;
     mainT.angle = 0;
@@ -667,6 +558,20 @@ void reset_draw_state(int state) {
                 toDraw[p][q] = state;
             }
         }
+    }
+}
+
+void delete_paths(size_t i, size_t j) {
+    if (i!=0) {
+        for (size_t ii=0; ii<i; ii++) {
+            for (size_t jj=0; jj<toDraw[ii].size(); jj++) {
+                toDraw[ii][jj] = -1;
+            }
+        }
+        return delete_paths(i-1, j);
+    }
+    for (size_t jj=0; jj<j; jj++) {
+        toDraw[0][jj] = -1;
     }
 }
 
@@ -708,14 +613,23 @@ void display_callback() {
       glVertex2f(0, -5); glVertex2f(0, 6);
     glEnd();
     
+    pair2i c;
     glColor3f(1, 1, 1);
     pair2f p1, p2; // points
     float d(0); // distance traveled
     pair2f temp; // to store (dist traveled, total dist) returned by draw_line
-    // 1 call of the funtion per frame so the distance to travel is the speed
+    // 1 call of the funtion per frame so the distance to travel is the speed (in pix/frame)
     float toTravel(speed);
+    
     for (size_t i=0; i<toDraw.size(); i++) {
         for (size_t j=0; j<toDraw[i].size(); j++) {
+            if (cls.size()>0) {
+                c = cls.front();
+                if (c.first==i && c.second==j) {
+                    delete_paths(i, j);
+                    cls.erase(cls.begin());
+                }
+            }
             p1 = paths[i][j];
             p2 = paths[i][j+1];
             if (p1==p2) { // bug inf loop if same points
@@ -723,6 +637,8 @@ void display_callback() {
             }
             if (toDraw[i][j] >= 1) { // draw the whole line
                 draw_line(p1.first, p1.second, p2.first, p2.second, 1);
+            } else if (toDraw[i][j] < 0) {
+                continue;
             } else {
                 temp = draw_line(p1.first, p1.second, p2.first, p2.second, toDraw[i][j]);
                 d += temp.first;
@@ -766,7 +682,6 @@ void keyboard_callback(unsigned char key, int x, int y) {
         reset();
         reset_draw_state(1);
     }
-    //std::cout << (int)key << std::endl;
 }
 
 int main(int argc, char **argv) {

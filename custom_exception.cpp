@@ -39,6 +39,10 @@ std::string InvalidArgToFunction::get_args_str() const {
     return s;
 }
 
+std::string InvalidArgToFunction::get_name() const {
+    return functionName;
+}
+
 
 InvalidFunctionDefinition::InvalidFunctionDefinition(std::string name) : functionName(name) {}
 

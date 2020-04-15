@@ -1,38 +1,47 @@
 
-TO DOTTED_LINE :LEN :N
-REPEAT :N [FD :LEN PU FD :LEN PD]
-END
-
-TO TRIANGLE :LEN
-REPEAT 3 [FD :LEN RT 120]
-END
-
-TO SQUARE
-REPEAT 4 [FD 100 RT 90]
-END
-
-PU SETXY 100 100 PD
-REPEAT 10 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
-
-PU SETXY -100 -100 PD
-REPEAT 2 [DOTTED_LINE 4 4 10 RT 80]
+#PU SETXY 100 100 PD
+#REPEAT 20 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
 
 
 
-#path travelled by sharks
-#search in an area, big step, search, big step ...
 TO rand_path :len :steps
 repeat :steps [fd :len rt random 360]
 END
 
-repeat 5 [rand_path 4 20 FD 80]
+to sharkpath :steps
+repeat :steps [rand_path 4 20 FD 100]
+end
 
 to leaf :size
-repeat 60 [FD :size RT 2]
+repeat 60 [FD :size RT 2 ]
 RT 60
 repeat 60 [FD :size RT 2]
 RT 60
 end
 
+to flower
 repeat 30 [leaf 4 RT 12]
+end
 
+#repeat (100-98) [FD 50 RT 45]
+
+to polygon :size :sides
+repeat :sides/2 [fd :size rt 360/:sides]
+pu fd 10 pd
+cs
+repeat :sides/2 [fd :size rt 360/:sides]
+end
+
+#repeat 8 [rt 45 repeat 6 [repeat 90 [fd 2 rt 2] rt 90 ]]
+
+#repeat 4000 [repeat 34 [fd 12 rt 10] rt 90]
+
+#repeat 36 [fd 60 rt 61 bd 80 lt 41 fd 85 rt 41]
+#repeat 16 [fd 85 lt 60 fd 107 bd 72 lt 53 fd 74]
+#repeat 18 [repeat 5 [rt 40 fd 200 rt 120] rt 20]
+
+to home
+setxy 0 0
+end
+
+repeat 200 [pu home sh random 361 fd 40 pd fd random 200]

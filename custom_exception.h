@@ -29,6 +29,7 @@ class InvalidArgToFunction : public std::exception {
       const char* what();
       std::string get_param_str() const;
       std::string get_args_str() const;
+      std::string get_name() const;
 };
 
 class InvalidFunctionDefinition : public std::exception {

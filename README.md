@@ -32,6 +32,7 @@ Pressing 'space' will reload the file and redraw the instructions
         #*
         multiline comment
         *#
+        CLEARSCREEN or CS       # clear the screen
  - Procedures
 
         TO DOTTED_LINE              # 'TO' and the name of the procedure  
@@ -47,17 +48,17 @@ Pressing 'space' will reload the file and redraw the instructions
 
         SETPENCOLOR R G B       # change the pen color (3 integers <256)
         SETBGCOLOR R G B        # change the background color (3 integers <256)
-        CLEARSCREEN or CS       # clear the screen
         SETSPEED                # set the speed of the animation in pixels per frame (fixed at 40 FPS)
         WAIT N                  # wait N seconds
 
 ## TODO
- - Allow arithmetic operation "+-*/()" (with regex ???)
  - A set pen color keyword with RGB as arguments
- - A clear screen keyword
  - A wait keyword to control the animation
 
 ## Updates
+
+### 15/04/2020
+ - New keyword : CLEARSCREEN (or CS)
 
 ### 14/04/2020
  - Handle arithmetic operations +-*/()
