@@ -21,15 +21,15 @@ class UnknownName : public std::exception {
 
 class InvalidArgToFunction : public std::exception {
     private:
-      std::string functionName;
-      VecStr parameters;
+      const std::string functionName;
+      const VecStr parameters;
       const VecStr arguments;
     public:
       InvalidArgToFunction(std::string name, VecStr param, VecStr args);
       const char* what();
-      std::string get_param_str() const;
-      std::string get_args_str() const;
-      std::string get_name() const;
+      const std::string get_param_str() const;
+      const std::string get_args_str() const;
+      const std::string get_name() const;
 };
 
 class InvalidFunctionDefinition : public std::exception {
@@ -38,12 +38,12 @@ class InvalidFunctionDefinition : public std::exception {
     public:
       InvalidFunctionDefinition(std::string name);
       const char* what();
-      std::string get_func();
+      const std::string get_func() const;
 };
 
 class BracketNotMatching : public std::exception {
     private:
-      int count;
+      const int count;
     public:
       BracketNotMatching(int counter);
       const char* what();

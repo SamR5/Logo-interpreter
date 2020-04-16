@@ -35,12 +35,12 @@ struct Function;
 
 
 void init();
-bool is_number(std::string s);
-float to_number(std::string s);
+bool is_number(const std::string& s);
+float to_number(const std::string& s);
 int random_range(int a, int b);
 void to_mainSet();
-bool extract_functions(VecStr set);
-int apply_operator(VecStr& set, char op);
+bool extract_functions(const VecStr& set);
+int apply_operator(VecStr& set, const char op);
 int apply_arithmetics(VecStr& set);
 bool move_turtle(VecStr set, Turtle& T); // return false on exception
 void reset();
@@ -48,17 +48,17 @@ void reset();
 void reset_draw_state(int state);
 void delete_paths(size_t i, size_t j); // in case of keyword cs
 float distance(float dx, float dy);
-pair2f draw_line(float x1, float y1, float x2, float y2, float ratio);
+const pair2f draw_line(float x1, float y1, float x2, float y2, float ratio);
 
 void display_callback();
 void reshape_callback(int width, int height);
 void timer_callback(int);
 void keyboard_callback(unsigned char key, int x, int y);
 
-VecStr longNames = {"FORWARD", "BACKWARD", "RIGHT", "LEFT", "PENUP", "PENDOWN",
-                    "SETXY", "REPEAT", "RANDOM", "SETHEADING", "CLEARSCREEN"};
-VecStr shortNames = {"FD", "BD", "RT", "LT", "PU", "PD",
-                     "SETXY", "REPEAT", "RANDOM", "SH", "CS"};
+const VecStr longNames = {"FORWARD", "BACKWARD", "RIGHT", "LEFT", "PENUP", "PENDOWN",
+                          "SETXY", "REPEAT", "RANDOM", "SETHEADING", "CLEARSCREEN"};
+const VecStr shortNames = {"FD", "BD", "RT", "LT", "PU", "PD",
+                           "SETXY", "REPEAT", "RANDOM", "SH", "CS"};
 const char* operators = "+-*/";
 const char* brackets = "[]()";
 std::string mainInstructions;
@@ -79,22 +79,22 @@ struct Turtle {
     float angle;
     bool isDown;
     bool savePath;
-    void fd(float value) {
+    void fd(const float& value) {
         x += value * std::cos(angle*DEG2RAD);
         y += value * std::sin(angle*DEG2RAD);
         if (isDown && savePath) {
             path.push_back({x, y});
         }
     }
-    void bd(float value) {
+    void bd(const float& value) {
         return fd(-value);
     }
-    void lt(float value) {
+    void lt(const float& value) {
         angle += value;
         while (angle<0) {angle += 360;}
         while (angle>360) {angle -= 360;}
     }
-    void rt(float value) {
+    void rt(const float& value) {
         return lt(-value);
     }
     void up() {
@@ -114,19 +114,19 @@ struct Turtle {
             path.push_back({x, y});
         }
     }
-    void setxy(float x_, float y_) {
+    void setxy(const float& x_, const float& y_) {
         x = x_;
         y = y_;
         if (isDown && savePath) {
             path.push_back({x, y});
         }
     }
-    void set_heading(float ngl) {
+    void set_heading(const float& ngl) {
         angle = ngl;
         while (angle<0) {angle += 360;}
         while (angle>360) {angle -= 360;}
     }
-    void clear_screen() {
+    void clear_screen() const {
         if (savePath) {
             cls.push_back({paths.size(), path.size()-1});
         }
@@ -136,7 +136,7 @@ struct Turtle {
 struct Function {
     VecStr parameters;
     VecStr funcInstructions;
-    VecStr get_instructions(VecStr arguments) {
+    const VecStr get_instructions(const VecStr& arguments) const {
         VecStr newInstructions = funcInstructions;
         for (std::size_t i=0; i<arguments.size(); i++) {
             std::replace(newInstructions.begin(), newInstructions.end(),
@@ -144,8 +144,8 @@ struct Function {
         }
         return newInstructions;
     }
-    bool is_valid(VecStr arguments) {
-        VecStr newInst = get_instructions(arguments);
+    bool is_valid(const VecStr& arguments) const {
+        const VecStr newInst = get_instructions(arguments);
         Turtle tempT;
         tempT.x = tempT.y = tempT.angle = 0;
         tempT.isDown = true;
@@ -162,7 +162,7 @@ struct Function {
         std::cout << std::endl;
     }
 };
-std::map<std::string, Function> functions;
+std::map<const std::string, Function> functions;
 
 void init() {
     glClearColor(0.2, 0.3, 0.4, 1.0);
@@ -172,8 +172,7 @@ void init() {
     speed = 2;
 }
 
-bool is_number(std::string s) {
-    // test try {to_number} catch (...) {return false;} return true;
+bool is_number(const std::string& s) {
     bool isFloat(false);
     for (size_t i=0; i<s.length(); i++) {
         if (s[i]<'0' || s[i]>'9') {
@@ -189,7 +188,7 @@ bool is_number(std::string s) {
     return true;
 }
 
-float to_number(std::string s) {
+float to_number(const std::string& s) {
     bool isFloat(false);
     for (size_t i=0; i<s.size(); i++) {
         if (s[i]<'0' || s[i]>'9') {
@@ -278,7 +277,7 @@ void to_mainSet() {
     }
 }
 
-bool extract_functions(VecStr set) {
+bool extract_functions(const VecStr& set) {
     for (size_t i=0; i<set.size(); i++) {
         if (set[i] == "TO") {
             try {
@@ -315,7 +314,7 @@ bool extract_functions(VecStr set) {
     return true;
 }
 
-int apply_operator(VecStr& set, char op) {
+int apply_operator(VecStr& set, const char op) {
     bool change(false);
     for (int i=0; i<set.size()-2; i++) {
         if (is_number(set[i]) && is_number(set[i+2])) {
@@ -579,12 +578,12 @@ float distance(float dx, float dy) {
     return std::sqrt(dx*dx + dy*dy);
 }
 
-pair2f draw_line(float x1, float y1, float x2, float y2, float ratio) {
-    float dx = x2-x1;
-    float dy = y2-y1;
-    float dist = distance(dx, dy);
+const pair2f draw_line(float x1, float y1, float x2, float y2, float ratio) {
+    const float dx = x2-x1;
+    const float dy = y2-y1;
+    const float dist = distance(dx, dy);
     float xt, yt; // intermediate value
-    float toTravel = speed;
+    const float toTravel = speed;
     if (ratio >= 1) {
         glBegin(GL_LINE_STRIP);
           glVertex2f(x1, y1);

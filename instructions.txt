@@ -1,6 +1,6 @@
 
-#PU SETXY 100 100 PD
-#REPEAT 20 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
+PU SETXY 100 100 PD
+REPEAT 20 [REPEAT 30 [FD 10 RT 6] LT 18 PU SETXY 100 100 PD]
 
 
 
@@ -23,7 +23,8 @@ to flower
 repeat 30 [leaf 4 RT 12]
 end
 
-#repeat (100-98) [FD 50 RT 45]
+pu setxy -200 -200 pd
+flower
 
 to polygon :size :sides
 repeat :sides/2 [fd :size rt 360/:sides]

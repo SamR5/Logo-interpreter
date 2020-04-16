@@ -1,6 +1,6 @@
-all: flocking_simulation
+all: main
 
-flocking_simulation: main.o custom_exception.o file_parse.o
+main: main.o custom_exception.o file_parse.o
 	g++ -o Logo_interpreter main.o custom_exception.o file_parse.o -lGL -lGLU -lglut -O3 -no-pie
 
 custom_exception.o: custom_exception.cpp

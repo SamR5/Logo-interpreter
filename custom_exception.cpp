@@ -23,7 +23,7 @@ const char* InvalidArgToFunction::what() {
     return "Invalid argument to function";
 }
 
-std::string InvalidArgToFunction::get_param_str() const {
+const std::string InvalidArgToFunction::get_param_str() const {
     std::string s;
     for (auto p : parameters) {
         s += p + " ";
@@ -31,7 +31,7 @@ std::string InvalidArgToFunction::get_param_str() const {
     return s;
 }
 
-std::string InvalidArgToFunction::get_args_str() const {
+const std::string InvalidArgToFunction::get_args_str() const {
     std::string s;
     for (auto a : arguments) {
         s += a + " ";
@@ -39,7 +39,7 @@ std::string InvalidArgToFunction::get_args_str() const {
     return s;
 }
 
-std::string InvalidArgToFunction::get_name() const {
+const std::string InvalidArgToFunction::get_name() const {
     return functionName;
 }
 
@@ -50,7 +50,7 @@ const char* InvalidFunctionDefinition::what() {
     return "Invalid function definition";
 }
 
-std::string InvalidFunctionDefinition::get_func() {
+const std::string InvalidFunctionDefinition::get_func() const {
     return functionName;
 }
 
